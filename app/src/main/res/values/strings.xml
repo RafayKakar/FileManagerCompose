@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">File Manager</string>
+    <string name="allow_storage_permission">We require access to your files to provide you with the best possible experience. With your permission, we will be able to:\n
+
+1-Upload and Download Files: Seamlessly upload files from your device and download files to it.\n
+2-Organize Your Files: Help you organize and manage your files efficiently within our application.\n
+3-Share Files: Easily share files with others directly from our app.\n
+4-Backup and Restore: Automatically back up your important files and restore them when needed.\n
+5-Edit Documents: Enable you to open, edit, and save changes to documents stored on your device.</string>
+    <string name="lets_start">Let\'s Start</string>
+    <string name="allow_permission">Allow Permission</string>
+    <string name="not_now">Not Now</string>
+</resources>
