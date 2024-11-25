@@ -4,6 +4,7 @@ plugins {
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -33,24 +34,23 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
-    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
+
 
 dependencies {
 
@@ -113,26 +113,9 @@ dependencies {
     implementation("androidx.room:room-ktx:2.5.2")
 
 
-    implementation("com.guolindev.permissionx:permissionx:1.8.0")
+    implementation(libs.permissionx)
 
-// https://mvnrepository.com/artifact/e-iceblue/spire.doc
-//    implementation("e-iceblue:spire.doc:12.8.4")
-//    implementation("e-iceblue:spire.doc:12.7.17")
-//    implementation(libsorg.apache.poi.xwpf.converter.pdf)
-//    implementation(libs.fr.opensagres.poi.xwpf.converter.pdf)
-//    implementation(libs.fr.opensagres.poi.xwpf.converter.pdf.v210)
-    implementation("fr.opensagres.xdocreport:fr.opensagres.poi.xwpf.converter.pdf:2.0.1")
-
-
-//    implementation ("org.apache.poi:poi:5.2.3")
-//    implementation ("org.apache.poi:poi-scratchpad:5.2.3") // Needed for HWPFDocument
-//    implementation ("com.itextpdf:itext7-core:7.2.5") // or OpenPDF as an alternative
-
-//    //Lifecycle
-//    var lifecycle_version = "2.2.0-rc03"
-//    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
-//    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
-//    kapt("androidx.lifecycle:lifecycle-compiler:$lifecycle_version")
-
+    implementation(libs.androidx.paging.runtime.ktx)
+    runtimeOnly (libs.accompanist.placeholder.material.v0360)
 
 }

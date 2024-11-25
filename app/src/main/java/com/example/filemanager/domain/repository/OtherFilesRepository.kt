@@ -1,8 +1,10 @@
 package com.example.filemanager.domain.repository
 
+import androidx.paging.PagingData
+import com.example.filemanager.domain.model.FileItem
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 interface OtherFilesRepository {
-    suspend fun getOtherFiles(): Flow<File>
+    suspend fun getOtherFiles(): Flow<PagingData<FileItem>>
 }

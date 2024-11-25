@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.filemanager.domain.model.FileItem
 import com.example.filemanager.presentation.commons.FileListItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,9 +39,13 @@ fun DocumentsScreen(
     documentsViewModel: DocumentsViewModel = hiltViewModel()
 ) {
 
-    val documents by documentsViewModel.documents.collectAsState()
+    val documentsList = documentsViewModel.documents.collectAsLazyPagingItems()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Text(text = "Documents", style = MaterialTheme.typography.bodyMedium)
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -49,7 +54,7 @@ fun DocumentsScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(documents) { file ->
+            items(items = documentsList.itemSnapshotList.items) { file ->
                 FileListItem(file)
             }
         }

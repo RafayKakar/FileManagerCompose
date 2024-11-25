@@ -11,6 +11,6 @@ fun OthersScreen(
     mediaScreenViewModel: MediaScreenViewModel = hiltViewModel()
 ) {
 
-    val mediaFilesList by mediaScreenViewModel.mediafiles.collectAsState()
+//    val mediaFilesList by mediaScreenViewModel.mediafiles.collectAsState()
 
 }

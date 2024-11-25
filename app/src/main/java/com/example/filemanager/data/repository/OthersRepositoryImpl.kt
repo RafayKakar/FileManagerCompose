@@ -5,16 +5,17 @@ import android.os.Build
 import android.provider.MediaStore
 import android.provider.MediaStore.VOLUME_EXTERNAL
 import android.webkit.MimeTypeMap
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.example.filemanager.data.remote.FilesPagingSource
 import com.example.filemanager.domain.model.FileItem
 import com.example.filemanager.domain.repository.RecentFilesRepository
 import com.example.filemanager.utils.getFormattedTime
 import com.example.filemanager.utils.isFileEmptyHiddenOrCache
 import com.example.filemanager.utils.sizeFormatter
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import java.io.File
 import javax.inject.Inject
 
@@ -26,7 +27,7 @@ class OthersRepositoryImpl @Inject constructor(
 
     var otherFiles = ArrayList<FileItem>()
 
-    override suspend fun getRecentFiles(): Flow<List<FileItem>> {
+    override suspend fun getRecentFiles(): Flow<PagingData<FileItem>> {
 
         val rar = MimeTypeMap.getSingleton().getMimeTypeFromExtension("rar")
         val zip = MimeTypeMap.getSingleton().getMimeTypeFromExtension("zip")
@@ -111,10 +112,12 @@ class OthersRepositoryImpl @Inject constructor(
         }
 
 
-        return flow {
-            emit(
-                otherFiles
-            )
-        }.flowOn(Dispatchers.IO)
+//        return Pager(
+//            config = PagingConfig(pageSize = 20),
+//            pagingSourceFactory = {
+////                FilesPagingSource(otherFiles!!)
+//            }
+//        ).flow
+        return null!!
     }
 }

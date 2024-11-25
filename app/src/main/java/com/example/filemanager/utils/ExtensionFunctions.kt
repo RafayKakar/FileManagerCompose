@@ -151,6 +151,3 @@ fun Context.sizeFormatter(size: Long): String =
 fun Modifier.testLine(color: Color = Color.Red) = border(
     width = 2.dp, color = color, shape = RectangleShape
 )
-
-fun Activity.convertWordToPdf() {
-}

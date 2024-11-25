@@ -46,29 +46,47 @@ import com.example.filemanager.R
 import com.example.filemanager.domain.model.FileItem
 import com.example.filemanager.utils.compressBitmapWithoutSizeLoss
 import com.example.filemanager.utils.log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ItemListComponent(
     fileItem: FileItem,
     context: Context = LocalContext.current
 ) {
+
     val imageLoading = remember {
         mutableStateOf(true)
     }
-    val fileImageIcon = remember {
+    val fileImageIcon = remember{
         mutableStateOf<Bitmap?>(null)
     }
+
+
     LaunchedEffect(Unit) {
         val imageBitmap = try {
-            BitmapFactory.decodeFile(fileItem.path).apply {
-                byteCount
+
+            withContext(Dispatchers.IO){
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true // Only load image dimensions
+                }
+                BitmapFactory.decodeFile(fileItem.path, options)
+
+                options.inSampleSize = calculateInSampleSize(options, 60, 60) // Target size, adjust as needed
+                options.inJustDecodeBounds = false // Load the actual bitmap
+
+                // Decode bitmap with calculated sample size
+                BitmapFactory.decodeFile(fileItem.path, options)
             }
+
         } catch (e: Exception) {
             BitmapFactory.decodeResource(context.resources, R.drawable.human_image_1)
         }
+
         fileImageIcon.value = imageBitmap
         imageLoading.value = false
     }
+
     Box (
         modifier = Modifier
             .fillMaxSize()
@@ -106,6 +124,7 @@ fun ItemListComponent(
                     },
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
+
                 Row (
                     modifier = Modifier
                         .fillMaxWidth()
@@ -115,25 +134,23 @@ fun ItemListComponent(
                 ) {
                     when (imageLoading.value) {
                         true -> {
-//                            CircularProgressIndicator(
-//                                modifier = Modifier
-//                                    .padding(5.dp)
-//                                    .size(60.dp),
-//                                color = MaterialTheme.colorScheme.secondary,
-//                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-//                            )
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .padding(5.dp)
+                                    .size(60.dp),
+                                color = MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
                         }
                         false -> {
                             fileImageIcon.value?.let { fileIcon ->
-//                                Image(
-//                                )
                                 Image(
                                     painter = rememberAsyncImagePainter(
                                         ImageRequest.Builder(LocalContext.current)
                                             .data(data = fileIcon).apply(block = fun ImageRequest.Builder.() {
                                             }).build()
                                     ),
-                                    contentDescription = "file_icon", // Provide content description as needed
+                                    contentDescription = "file_i    con", // Provide content description as needed
                                     modifier = Modifier
                                         .size(60.dp)
                                         .padding(5.dp)
@@ -141,18 +158,6 @@ fun ItemListComponent(
                                         .align(Alignment.Top),
                                     contentScale = ContentScale.Crop
                                 )
-//                                 AsyncImage(
-//                                    model = ImageRequest.Builder(LocalContext.current)
-//                                        .data(fileIcon)
-//                                        .build(),
-//                                    contentDescription = null,
-//                                    modifier = Modifier
-//                                        .size(60.dp)
-//                                        .padding(5.dp)
-//                                        .clip(CircleShape)
-//                                        .align(Alignment.Top),
-//                                    contentScale = ContentScale.Crop,
-//                                )
                             }
                         }
                     }
@@ -175,18 +180,6 @@ fun ItemListComponent(
                         contentDescription = "file_options_description",
                         tint = Color("#C4E1F6".toColorInt())
                     )
-//                    AsyncImage(
-//                        model = ImageRequest.Builder(LocalContext.current)
-//                            .data(R.drawable.dots_vertical_svgrepo_com)
-//                            .build(),
-//                        contentDescription = null,
-//                        modifier = Modifier
-//                            .padding(
-//                                end = 12.dp
-//                            )
-//                            .size(18.dp),
-//                        contentScale = ContentScale.Crop,
-//                    )
                 }
                 Text(
                     text = fileItem.lastModifiedTime,
@@ -198,7 +191,29 @@ fun ItemListComponent(
                     fontSize = MaterialTheme.typography.bodySmall.fontSize,
                     fontWeight = FontWeight.Bold
                 )
+
+
             }
         }
     }
+}
+
+
+
+fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    val (height: Int, width: Int) = options.outHeight to options.outWidth
+    var inSampleSize = 1
+
+    if (height > reqHeight || width > reqWidth) {
+        val halfHeight: Int = height / 2
+        val halfWidth: Int = width / 2
+
+        // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+        // height and width larger than the requested height and width.
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+
+    return inSampleSize
 }

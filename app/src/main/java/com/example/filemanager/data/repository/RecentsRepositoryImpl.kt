@@ -1,23 +1,28 @@
 package com.example.filemanager.data.repository
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.database.Cursor
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.MediaStore.VOLUME_EXTERNAL
 import android.webkit.MimeTypeMap
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.example.filemanager.data.remote.FilesPagingSource
 import com.example.filemanager.domain.model.FileItem
-import com.example.filemanager.domain.repository.DocumentsRepository
 import com.example.filemanager.domain.repository.RecentFilesRepository
 import com.example.filemanager.utils.getFormattedTime
 import com.example.filemanager.utils.isFileEmptyHiddenOrCache
 import com.example.filemanager.utils.sizeFormatter
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
@@ -26,9 +31,8 @@ class RecentsRepositoryImpl @Inject constructor(
     val context: Context
 ) : RecentFilesRepository {
 
-    var recentFilesList = ArrayList<FileItem>()
 
-    override suspend fun getRecentFiles(): Flow<List<FileItem>> {
+    override suspend fun getRecentFiles(): Flow<PagingData<FileItem>> = flow {
 
         val pdf = MimeTypeMap.getSingleton().getMimeTypeFromExtension("pdf")
         val doc = MimeTypeMap.getSingleton().getMimeTypeFromExtension("doc")
@@ -131,45 +135,54 @@ class RecentsRepositoryImpl @Inject constructor(
             val dateIndex =
                 fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
 
-            while (fileCursor.moveToNext()) {
+            var channel = Channel<FileItem>(Channel.UNLIMITED)
 
-                var nameCR = fileCursor.getString(nameIndex)
-                var pathCR = fileCursor.getString(dataIndex)
-                var typeCR = fileCursor.getString(typeIndex)
-                val sizeCR = context.sizeFormatter(fileCursor.getString(sizeIndex).toLong())
-                val dateCR = getFormattedTime(fileCursor.getString(dateIndex).toLong())
+            // Coroutine to emit items as they are fetched
+            CoroutineScope(Dispatchers.IO).launch {
+                while (fileCursor.moveToNext()) {
 
-                if (nameCR == null) nameCR =
-                    fileCursor.getString(fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.TITLE))
-                if (pathCR == null) pathCR = ""
-                if (typeCR == null) typeCR = ""
+                    var nameCR = fileCursor.getString(nameIndex)
+                    var pathCR = fileCursor.getString(dataIndex)
+                    var typeCR = fileCursor.getString(typeIndex)
+                    val sizeCR = context.sizeFormatter(fileCursor.getString(sizeIndex).toLong())
+                    val dateCR = getFormattedTime(fileCursor.getString(dateIndex).toLong())
 
-                var fileItem = FileItem(
-                    nameCR,
-                    pathCR,
-                    typeCR,
-                    sizeCR,
-                    dateCR,
-                    fileCursor.getString(dateIndex).toLong()
-                )
+                    if (nameCR == null) nameCR =
+                        fileCursor.getString(fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.TITLE))
+                    if (pathCR == null) pathCR = ""
+                    if (typeCR == null) typeCR = ""
 
-                val (isEmpty, isHidden, isCache) = isFileEmptyHiddenOrCache(
-                    File(fileItem.path),
-                    context
-                )
+                    var fileItem = FileItem(
+                        nameCR,
+                        pathCR,
+                        typeCR,
+                        sizeCR,
+                        dateCR,
+                        fileCursor.getString(dateIndex).toLong()
+                    )
 
-                if (!isEmpty && !isHidden && !isCache)
-                    recentFilesList.add(fileItem)
+                    val (isEmpty, isHidden, isCache) = isFileEmptyHiddenOrCache(
+                        File(fileItem.path),
+                        context
+                    )
+
+                    if (!isEmpty && !isHidden && !isCache)
+                        channel.send(fileItem)
+                }
             }
-
             fileCursor.close()
+
+            emitAll(
+                Pager(
+                    config = PagingConfig(pageSize = 10),
+                    pagingSourceFactory = {
+                        FilesPagingSource(channel.receiveAsFlow())
+                    }
+                ).flow
+            )
         }
 
 
-        return flow {
-            emit(
-                recentFilesList
-            )
-        }.flowOn(Dispatchers.IO)
+
     }
 }

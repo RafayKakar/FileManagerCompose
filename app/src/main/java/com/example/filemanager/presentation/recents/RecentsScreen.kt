@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.filemanager.presentation.commons.FileListItem
 import com.example.filemanager.presentation.commons.ItemListComponent
 
@@ -27,7 +28,7 @@ import com.example.filemanager.presentation.commons.ItemListComponent
 @Composable
 fun RecentsScreen( recentsViewModel: RecentsViewModel = hiltViewModel()) {
 
-    val recentFiles by recentsViewModel.recents.collectAsState()
+    val recentFiles = recentsViewModel.recentFiles.collectAsLazyPagingItems()
 
     Column(
         modifier = Modifier
@@ -38,32 +39,13 @@ fun RecentsScreen( recentsViewModel: RecentsViewModel = hiltViewModel()) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-//        Column (
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .verticalScroll(rememberScrollState()),
-//            verticalArrangement = Arrangement.spacedBy(30.dp)
-//        ) {
-//            recentFiles.map { file ->
-//                ItemListComponent(fileItem = file)
-//            }
-////            items(recentFiles) { file ->
-//////                FileListItem(file)
-////            }
-//        }
-
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(30.dp)
         ) {
             items(
-                items = recentFiles.take(20),
-                key = {
-                    it.hashCode()
-                }
-            ) { file ->
+                recentFiles.itemSnapshotList.items) { file ->
                 ItemListComponent(fileItem = file)
-//                FileListItem(file)
             }
         }
     }
