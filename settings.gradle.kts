@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FileManager"
 include(":app")
- 
+include(":benchmark")

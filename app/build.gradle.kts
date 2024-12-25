@@ -22,6 +22,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "LOW-BATTERY"
+
     }
 
     buildTypes {
@@ -32,6 +35,15 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("benchmark") {
+            initWith(buildTypes.getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            proguardFiles("benchmark-rules.pro")
+        }
+
+
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -110,7 +122,7 @@ dependencies {
     var room_version = "2.5.2"
     implementation("androidx.room:room-runtime:$room_version")
     kapt("androidx.room:room-compiler:$room_version")
-    implementation("androidx.room:room-ktx:2.5.2")
+    implementation("androidx.room:room-ktx:$room_version")
 
 
     implementation(libs.permissionx)

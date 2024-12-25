@@ -19,9 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -30,19 +28,12 @@ class MediaRepositoryImpl @Inject constructor(
     @ApplicationContext val context: Context
 ) : MediaFilesRepository {
 
-    var mediaFilesList = ArrayList<FileItem>()
+    // Precompute MIME types for supported media
+    private val mimeTypes = listOf(
+        "mp3", "mp4", "jpg", "png", "jpeg", "wav"
+    ).mapNotNull { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it) }
 
-
-    // Precompute constants for MIME types and columns
-    private val mimeTypes = arrayOf(
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("mp3"),
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("mp4"),
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("jpg"),
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("png"),
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("jpeg"),
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension("wav")
-    )
-
+    // Columns to retrieve
     private val columns = arrayOf(
         MediaStore.Files.FileColumns.DISPLAY_NAME,
         MediaStore.Files.FileColumns.TITLE,
@@ -52,84 +43,63 @@ class MediaRepositoryImpl @Inject constructor(
         MediaStore.Files.FileColumns.DATE_MODIFIED
     )
 
-    override suspend fun getMediaFiles(): Flow<PagingData<FileItem>> = flow {
+    override suspend fun getMediaFiles(): Flow<PagingData<FileItem>> {
+        return Pager(
+            config = PagingConfig(pageSize = 10),
+            pagingSourceFactory = { FilesPagingSource(fetchMediaFiles()) }
+        ).flow
+    }
 
+    private fun fetchMediaFiles(): Flow<FileItem> = flow {
         val table = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Files.getContentUri(VOLUME_EXTERNAL)
+            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
         } else {
             MediaStore.Files.getContentUri("external")
         }
 
-        val where = (MediaStore.Files.FileColumns.MIME_TYPE + "=? OR " +
-                MediaStore.Files.FileColumns.MIME_TYPE + "=? OR " +
-                MediaStore.Files.FileColumns.MIME_TYPE + "=? OR " +
-                MediaStore.Files.FileColumns.MIME_TYPE + "=? OR " +
-                MediaStore.Files.FileColumns.MIME_TYPE + "=? OR " +
-                MediaStore.Files.FileColumns.MIME_TYPE + "=?")
+        // Build query conditions dynamically
+        val selection = mimeTypes.joinToString(" OR ") { "${MediaStore.Files.FileColumns.MIME_TYPE}=?" }
+        val selectionArgs = mimeTypes.toTypedArray()
 
         context.contentResolver.query(
             table,
             columns,
-            where,
-            mimeTypes,
-            null
-        )?.let { fileCursor ->
+            selection,
+            selectionArgs,
+            "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC" // Order by most recent
+        )?.use { cursor -> // Use ensures the cursor is closed properly
+            val nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+            val titleIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.TITLE)
+            val dataIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+            val sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
+            val typeIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
+            val dateIndex = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
 
-            val nameIndex =
-                fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
-            val dataIndex = fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
-            val sizeIndex = fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
-            val typeIndex = fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
-            val dateIndex =
-                fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(nameIndex)
+                    ?: cursor.getString(titleIndex) ?: ""
+                val path = cursor.getString(dataIndex) ?: ""
+                val mimeType = cursor.getString(typeIndex) ?: ""
+                val size = cursor.getLong(sizeIndex)
+                val modifiedDate = cursor.getLong(dateIndex)
 
-            var channel = Channel<FileItem>(Channel.UNLIMITED)
-            CoroutineScope(Dispatchers.IO).launch {
-                while (fileCursor.moveToNext()) {
-
-                    var nameCR = fileCursor.getString(nameIndex)
-                    var pathCR = fileCursor.getString(dataIndex)
-                    var typeCR = fileCursor.getString(typeIndex)
-                    val sizeCR = context.sizeFormatter(fileCursor.getString(sizeIndex).toLong())
-                    val dateCR = getFormattedTime(fileCursor.getString(dateIndex).toLong())
-
-                    if (nameCR == null) nameCR =
-                        fileCursor.getString(fileCursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.TITLE))
-                    if (pathCR == null) pathCR = ""
-                    if (typeCR == null) typeCR = ""
-
-                    var fileItem = FileItem(
-                        nameCR,
-                        pathCR,
-                        typeCR,
-                        sizeCR,
-                        dateCR,
-                        fileCursor.getString(dateIndex).toLong()
-                    )
-
-                    val (isEmpty, isHidden, isCache) = isFileEmptyHiddenOrCache(
-                        File(fileItem.path),
-                        context
-                    )
-
-                    if (!isEmpty && !isHidden && !isCache)
-                        channel.send(fileItem)
-                }
-
-                channel.close() // Close the channel when all items are processed
-            }
-            fileCursor.close()
-
-
-            emitAll(
-                Pager(
-                    config = PagingConfig(pageSize = 10),
-                    pagingSourceFactory = {
-                        FilesPagingSource(channel.receiveAsFlow())
+                val file = File(path)
+                if (file.exists()) {
+                    val (isEmpty, isHidden, isCache) = isFileEmptyHiddenOrCache(file, context)
+                    if (!isEmpty && !isHidden && !isCache) {
+                        emit(
+                            FileItem(
+                                name = name,
+                                path = path,
+                                type = mimeType,
+                                size = context.sizeFormatter(size),
+                                lastModifiedTime = getFormattedTime(modifiedDate),
+                                lastModifiedTimeLong = modifiedDate
+                            )
+                        )
                     }
-                ).flow
-            )
+                }
+            }
         }
     }
-
 }
